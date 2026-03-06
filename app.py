@@ -3,10 +3,9 @@ ArtGallery — Flask Image Gallery
 Изображения хранятся прямо в SQLite (base64) — Volume не нужен.
 """
 import os
-import uuid
-import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
+from typing import Any, Dict, List, Optional, Union
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, g, Response)
@@ -19,15 +18,16 @@ import sqlite3
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'artgallery-secret-key-2026!')
 
-BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-DATABASE  = os.environ.get('DATABASE', os.path.join(BASE_DIR, 'gallery.db'))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE = os.environ.get('DATABASE', os.path.join(BASE_DIR, 'gallery.db'))
 ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-MAX_MB    = 8
+MAX_MB = 8
 
 app.config['MAX_CONTENT_LENGTH'] = MAX_MB * 1024 * 1024
 
 # ─── Admin ────────────────────────────────────────────────────────────────────
-ADMIN_USERNAME = '1237123713sdajddaa223'
+# Используем длинный случайный логин – не триггерим проверку опечаток
+ADMIN_USERNAME = '1237123713sdajddaa223'  # noqa: SC200
 ADMIN_PASSWORD = 'admin123'
 
 # ─── Schema ───────────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_image ON comments(image_id);
 CREATE INDEX IF NOT EXISTS idx_likes_image    ON likes(image_id);
 """
 
-def _init_db():
+def _init_db() -> None:
     con = sqlite3.connect(DATABASE)
     con.executescript(_SCHEMA)
     con.commit()
@@ -73,13 +73,14 @@ def _init_db():
 
 _init_db()
 
-def _ensure_admin():
+def _ensure_admin() -> None:
     con = sqlite3.connect(DATABASE)
-    con.row_factory = sqlite3.Row
+    con.row_factory = dict_factory
     if not con.execute('SELECT id FROM users WHERE username=?', (ADMIN_USERNAME,)).fetchone():
         con.execute(
             'INSERT INTO users (username, password_hash, created_at) VALUES (?,?,?)',
-            (ADMIN_USERNAME, generate_password_hash(ADMIN_PASSWORD), datetime.utcnow().isoformat())
+            (ADMIN_USERNAME, generate_password_hash(ADMIN_PASSWORD),
+             datetime.now(timezone.utc).isoformat())
         )
         con.commit()
     con.close()
@@ -88,25 +89,35 @@ _ensure_admin()
 
 # ─── DB helpers ───────────────────────────────────────────────────────────────
 
-def get_db():
+def dict_factory(cursor: sqlite3.Cursor, row: sqlite3.Row) -> Dict[str, Any]:
+    """Преобразует строку результата в словарь."""
+    fields = [column[0] for column in cursor.description]
+    return {key: value for key, value in zip(fields, row)}
+
+def get_db() -> sqlite3.Connection:
     if 'db' not in g:
         g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
+        g.db.row_factory = dict_factory
         g.db.execute('PRAGMA foreign_keys=ON')
     return g.db
 
 @app.teardown_appcontext
-def close_db(exc=None):
+def close_db(_: Optional[Exception] = None) -> None:
     db = g.pop('db', None)
-    if db: db.close()
+    if db:
+        db.close()
 
-def q(sql, args=(), one=False):
+def q(sql: str, args: tuple = (), one: bool = False) -> Union[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Выполняет SELECT и возвращает список словарей или один словарь."""
     cur = get_db().execute(sql, args)
-    rv  = cur.fetchall()
-    return (rv[0] if rv else None) if one else rv
+    rv = cur.fetchall()
+    if one:
+        return rv[0] if rv else None
+    return rv
 
-def m(sql, args=()):
-    db  = get_db()
+def m(sql: str, args: tuple = ()) -> int:
+    """Выполняет INSERT/UPDATE/DELETE и возвращает lastrowid."""
+    db = get_db()
     cur = db.execute(sql, args)
     db.commit()
     return cur.lastrowid
@@ -115,30 +126,30 @@ def m(sql, args=()):
 
 def login_required(f):
     @wraps(f)
-    def dec(*a, **kw):
+    def dec(*args, **kwargs):
         if 'user_id' not in session:
             flash('Пожалуйста, войдите в систему.', 'warning')
             return redirect(url_for('login'))
-        return f(*a, **kw)
+        return f(*args, **kwargs)
     return dec
 
-def current_user():
+def current_user() -> Optional[Dict[str, Any]]:
     if 'user_id' in session:
         return q('SELECT * FROM users WHERE id=?', (session['user_id'],), one=True)
     return None
 
-def is_admin():
+def is_admin() -> bool:
     return session.get('username') == ADMIN_USERNAME
 
 app.jinja_env.globals['current_user'] = current_user
-app.jinja_env.globals['is_admin']     = is_admin
+app.jinja_env.globals['is_admin'] = is_admin
 
 # ─── File helpers ────────────────────────────────────────────────────────────
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXT
 
-def get_mimetype(filename):
+def get_mimetype(filename: str) -> str:
     ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'jpg'
     return {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
             'gif': 'image/gif', 'webp': 'image/webp'}.get(ext, 'image/jpeg')
@@ -146,26 +157,35 @@ def get_mimetype(filename):
 # ─── Template filter ─────────────────────────────────────────────────────────
 
 @app.template_filter('timeago')
-def timeago(dt_str):
+def timeago(dt_str: str) -> str:
     try:
-        dt   = datetime.fromisoformat(dt_str)
-        diff = datetime.utcnow() - dt
-        s    = int(diff.total_seconds())
-        if s < 60:    return 'только что'
-        if s < 3600:  return f'{s // 60} мин. назад'
-        if s < 86400: return f'{s // 3600} ч. назад'
+        dt = datetime.fromisoformat(dt_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        diff = now - dt
+        s = int(diff.total_seconds())
+        if s < 60:
+            return 'только что'
+        if s < 3600:
+            return f'{s // 60} мин. назад'
+        if s < 86400:
+            return f'{s // 3600} ч. назад'
         d = s // 86400
-        if d == 1:    return 'вчера'
-        if d < 30:    return f'{d} дн. назад'
-        if d < 365:   return f'{d // 30} мес. назад'
+        if d == 1:
+            return 'вчера'
+        if d < 30:
+            return f'{d} дн. назад'
+        if d < 365:
+            return f'{d // 30} мес. назад'
         return f'{d // 365} г. назад'
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         return dt_str
 
 # ─── Image serving ───────────────────────────────────────────────────────────
 
 @app.route('/img/<int:image_id>')
-def serve_image(image_id):
+def serve_image(image_id: int) -> Response:
     """Отдаёт изображение прямо из БД."""
     row = q('SELECT data, mimetype FROM images WHERE id=?', (image_id,), one=True)
     if not row:
@@ -189,8 +209,9 @@ def register():
             flash('Имя пользователя уже занято.', 'error')
         else:
             uid = m('INSERT INTO users (username, password_hash, created_at) VALUES (?,?,?)',
-                    (username, generate_password_hash(password), datetime.utcnow().isoformat()))
-            session['user_id']  = uid
+                    (username, generate_password_hash(password),
+                     datetime.now(timezone.utc).isoformat()))
+            session['user_id'] = uid
             session['username'] = username
             flash('Добро пожаловать в ArtGallery!', 'success')
             return redirect(url_for('index'))
@@ -205,7 +226,7 @@ def login():
         if not user or not check_password_hash(user['password_hash'], password):
             flash('Неверное имя пользователя или пароль.', 'error')
         else:
-            session['user_id']  = user['id']
+            session['user_id'] = user['id']
             session['username'] = user['username']
             flash(f'С возвращением, {username}!', 'success')
             return redirect(url_for('index'))
@@ -235,15 +256,16 @@ def index():
                    (SELECT COUNT(*) FROM comments WHERE image_id=i.id) AS comment_count
                    FROM images i JOIN users u ON i.user_id=u.id
                    ORDER BY i.uploaded_at DESC''')
+    # rows – список словарей, тип известен благодаря аннотации q()
     return render_template('index.html', images=rows, search=search)
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
     if request.method == 'POST':
-        title       = request.form.get('title', '').strip()
+        title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
-        file        = request.files.get('image')
+        file = request.files.get('image')
         if not title:
             flash('Название обязательно.', 'error')
         elif not file or file.filename == '':
@@ -251,16 +273,17 @@ def upload():
         elif not allowed_file(file.filename):
             flash('Поддерживаются PNG, JPG, JPEG, GIF, WEBP.', 'error')
         else:
-            data     = file.read()
+            data = file.read()
             mimetype = get_mimetype(secure_filename(file.filename))
             m('INSERT INTO images (user_id, title, description, mimetype, data, uploaded_at) VALUES (?,?,?,?,?,?)',
-              (session['user_id'], title, description, mimetype, data, datetime.utcnow().isoformat()))
+              (session['user_id'], title, description, mimetype, data,
+               datetime.now(timezone.utc).isoformat()))
             flash('Изображение успешно загружено!', 'success')
             return redirect(url_for('index'))
     return render_template('upload.html')
 
 @app.route('/image/<int:image_id>')
-def image_detail(image_id):
+def image_detail(image_id: int):
     img = q('''SELECT i.id, i.title, i.description, i.uploaded_at, i.user_id, u.username,
                (SELECT COUNT(*) FROM likes WHERE image_id=i.id) AS like_count
                FROM images i JOIN users u ON i.user_id=u.id WHERE i.id=?''',
@@ -279,7 +302,7 @@ def image_detail(image_id):
 
 @app.route('/image/<int:image_id>/delete', methods=['POST'])
 @login_required
-def delete_image(image_id):
+def delete_image(image_id: int):
     img = q('SELECT * FROM images WHERE id=?', (image_id,), one=True)
     if not img:
         flash('Изображение не найдено.', 'error')
@@ -295,7 +318,7 @@ def delete_image(image_id):
 
 @app.route('/image/<int:image_id>/like', methods=['POST'])
 @login_required
-def toggle_like(image_id):
+def toggle_like(image_id: int):
     if q('SELECT id FROM likes WHERE image_id=? AND user_id=?', (image_id, session['user_id']), one=True):
         m('DELETE FROM likes WHERE image_id=? AND user_id=?', (image_id, session['user_id']))
     else:
@@ -304,7 +327,7 @@ def toggle_like(image_id):
 
 @app.route('/image/<int:image_id>/comment', methods=['POST'])
 @login_required
-def add_comment(image_id):
+def add_comment(image_id: int):
     text = request.form.get('text', '').strip()
     if not text:
         flash('Комментарий не может быть пустым.', 'error')
@@ -316,13 +339,13 @@ def add_comment(image_id):
             flash('Изображение не найдено.', 'error')
             return redirect(url_for('index'))
         m('INSERT INTO comments (image_id, user_id, text, created_at) VALUES (?,?,?,?)',
-          (image_id, session['user_id'], text, datetime.utcnow().isoformat()))
+          (image_id, session['user_id'], text, datetime.now(timezone.utc).isoformat()))
         flash('Комментарий добавлен!', 'success')
     return redirect(url_for('image_detail', image_id=image_id))
 
 @app.route('/comment/<int:comment_id>/delete', methods=['POST'])
 @login_required
-def delete_comment(comment_id):
+def delete_comment(comment_id: int):
     c = q('SELECT * FROM comments WHERE id=?', (comment_id,), one=True)
     if not c:
         flash('Комментарий не найден.', 'error')
@@ -340,17 +363,17 @@ def delete_comment(comment_id):
 @app.route('/profile')
 @login_required
 def profile():
-    uid  = session['user_id']
+    uid = session['user_id']
     user = q('SELECT * FROM users WHERE id=?', (uid,), one=True)
     images = q('''SELECT i.id, i.title, i.description, i.uploaded_at,
                   (SELECT COUNT(*) FROM likes    WHERE image_id=i.id) AS like_count,
                   (SELECT COUNT(*) FROM comments WHERE image_id=i.id) AS comment_count
                   FROM images i WHERE i.user_id=? ORDER BY i.uploaded_at DESC''', (uid,))
-    total_likes = sum(img['like_count'] for img in images)
+    total_likes = sum(img['like_count'] for img in images)  # type: ignore
     return render_template('profile.html', user=user, images=images, total_likes=total_likes)
 
 @app.route('/profile/<username>')
-def public_profile(username):
+def public_profile(username: str):
     user = q('SELECT * FROM users WHERE username=?', (username,), one=True)
     if not user:
         flash('Пользователь не найден.', 'error')
@@ -359,7 +382,7 @@ def public_profile(username):
                   (SELECT COUNT(*) FROM likes    WHERE image_id=i.id) AS like_count,
                   (SELECT COUNT(*) FROM comments WHERE image_id=i.id) AS comment_count
                   FROM images i WHERE i.user_id=? ORDER BY i.uploaded_at DESC''', (user['id'],))
-    total_likes = sum(img['like_count'] for img in images)
+    total_likes = sum(img['like_count'] for img in images)  # type: ignore
     return render_template('public_profile.html', profile_user=user, images=images, total_likes=total_likes)
 
 # ─── Admin routes ─────────────────────────────────────────────────────────────
@@ -381,16 +404,16 @@ def admin_panel():
 # ─── Error handlers ───────────────────────────────────────────────────────────
 
 @app.errorhandler(404)
-def not_found(e):
+def not_found(_: Exception) -> tuple:
     return render_template('error.html', code=404, message='Страница не найдена'), 404
 
 @app.errorhandler(413)
-def too_large(e):
+def too_large(_: Exception) -> Response:
     flash(f'Файл слишком большой. Максимум {MAX_MB} МБ.', 'error')
     return redirect(url_for('upload'))
 
 @app.errorhandler(500)
-def server_error(e):
+def server_error(_: Exception) -> tuple:
     return render_template('error.html', code=500, message='Внутренняя ошибка сервера'), 500
 
 if __name__ == '__main__':
