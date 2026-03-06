@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Загрузить изображение — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+<div class="upload-wrap">
+
+  <div class="page-header">
+    <a href="{{ url_for('index') }}" class="back-link">← Назад</a>
+    <h1>Загрузить работу</h1>
+    <p>Поделитесь своим творчеством с сообществом ArtGallery</p>
+  </div>
+
+  <div class="upload-card">
+    <form method="post" enctype="multipart/form-data">
+
+      <!-- Drop zone -->
+      <div class="form-group">
+        <label>Изображение *</label>
+        <div class="file-drop" id="dropZone">
+          <input type="file" id="fileInput" name="image" accept="image/*" required>
+          <div class="file-drop-icon">📁</div>
+          <span class="file-drop-label">Перетащите файл или нажмите для выбора</span>
+          <div class="file-drop-hint">PNG, JPG, JPEG, GIF, WEBP — максимум 16 МБ</div>
+          <div class="file-drop-name" id="fileName"></div>
+        </div>
+      </div>
+
+      <!-- Title -->
+      <div class="form-group">
+        <label for="title">Название *</label>
+        <input type="text" id="title" name="title" class="form-control"
+               placeholder="Придумайте название для вашей работы"
+               required maxlength="200"
+               value="{{ request.form.get('title', '') }}">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Описание</label>
+        <textarea id="description" name="description" class="form-control"
+                  placeholder="Расскажите о работе, технике, вдохновении… (необязательно)"
+                  maxlength="2000">{{ request.form.get('description', '') }}</textarea>
+        <div class="form-hint">Необязательно. Максимум 2000 символов.</div>
+      </div>
+
+      <div style="display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem;">
+        <a href="{{ url_for('index') }}" class="btn btn-ghost">Отмена</a>
+        <button type="submit" class="btn btn-primary">🖼 Опубликовать</button>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+</div>
+{% endblock %}
