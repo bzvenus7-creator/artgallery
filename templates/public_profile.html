@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ profile_user['username'] }} — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <a href="{{ url_for('index') }}" class="back-link">← Назад к галерее</a>
+
+  <!-- Profile header -->
+  <div class="profile-header">
+    <div class="profile-avatar">{{ profile_user['username'][0] }}</div>
+    <div class="profile-info">
+      <h2>{{ profile_user['username'] }}</h2>
+      <p>Участник с {{ profile_user['created_at'][:10] }}</p>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-item">
+        <span class="stat-num">{{ images|length }}</span>
+        <span class="stat-label">Работ</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">{{ total_likes }}</span>
+        <span class="stat-label">Лайков</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <h2>Работы автора</h2>
+    <span class="count-badge">{{ images|length }}</span>
+  </div>
+
+  {% if images %}
+  <div class="gallery-grid">
+    {% for img in images %}
+    <article class="image-card">
+      <a href="{{ url_for('image_detail', image_id=img['id']) }}" class="card-thumb">
+        <img src="{{ url_for('static', filename='uploads/' + img['filename']) }}"
+             alt="{{ img['title'] }}" loading="lazy">
+        <div class="card-overlay"><span>Открыть</span></div>
+      </a>
+      <div class="card-body">
+        <a class="card-title" href="{{ url_for('image_detail', image_id=img['id']) }}">
+          {{ img['title'] }}
+        </a>
+        {% if img['description'] %}
+          <p class="card-desc">{{ img['description'] }}</p>
+        {% endif %}
+        <div class="card-meta">
+          <span>{{ img['uploaded_at'][:10] }}</span>
+          <div class="card-stats">
+            <span>♥ {{ img['like_count'] }}</span>
+            <span>💬 {{ img['comment_count'] }}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">🖼️</span>
+    <h3>У этого автора пока нет работ</h3>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ image['title'] }} — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+  <a href="{{ url_for('index') }}" class="back-link">← Назад к галерее</a>
+
+  <div class="detail-layout">
+
+    <!-- ─── LEFT: Full image ──────────────────────────────── -->
+    <div>
+      <div class="detail-image-wrap">
+        <img src="{{ url_for('static', filename='uploads/' + image['filename']) }}"
+             alt="{{ image['title'] }}">
+      </div>
+    </div>
+
+    <!-- ─── RIGHT: Sidebar ───────────────────────────────── -->
+    <div class="detail-sidebar">
+
+      <!-- Info card -->
+      <div class="detail-card">
+        <h1 class="detail-title">{{ image['title'] }}</h1>
+
+        <div class="detail-meta">
+          <span>👤 <a href="{{ url_for('public_profile', username=image['username']) }}">{{ image['username'] }}</a></span>
+          <span>📅 {{ image['uploaded_at'][:10] }}</span>
+          <span>♥ {{ image['like_count'] }} лайков</span>
+        </div>
+
+        {% if image['description'] %}
+          <p class="detail-desc">{{ image['description'] }}</p>
+        {% endif %}
+
+        <!-- Action buttons -->
+        <div class="detail-actions">
+          {% set cu = current_user() %}
+          {% if cu %}
+            <!-- LIKE TOGGLE -->
+            <form action="{{ url_for('toggle_like', image_id=image['id']) }}" method="post">
+              <button type="submit" class="btn btn-like {% if user_liked %}liked{% endif %}">
+                {% if user_liked %}♥ Убрать лайк{% else %}♡ Лайк{% endif %}
+                ({{ image['like_count'] }})
+              </button>
+            </form>
+            <!-- DELETE: owner or admin -->
+            {% if cu['id'] == image['user_id'] or is_admin() %}
+              <form action="{{ url_for('delete_image', image_id=image['id']) }}" method="post"
+                    onsubmit="return confirm('Удалить изображение? Это действие необратимо.')">
+                <button type="submit" class="btn btn-danger btn-sm">
+                  🗑 {% if is_admin() and cu['id'] != image['user_id'] %}Удалить (admin){% else %}Удалить{% endif %}
+                </button>
+              </form>
+            {% endif %}
+          {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-ghost">♡ Войдите, чтобы лайкнуть</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Comments card -->
+      <div class="comments-card">
+        <div class="comments-header">
+          💬 Комментарии
+          <span class="count-badge">{{ comments|length }}</span>
+        </div>
+
+        {% if comments %}
+        <div class="comments-list">
+          {% for c in comments %}
+          <div class="comment-item">
+            <div class="comment-avatar">{{ c['username'][0] }}</div>
+            <div class="comment-content">
+              <div class="comment-header">
+                <span class="comment-author">
+                  <a href="{{ url_for('public_profile', username=c['username']) }}">{{ c['username'] }}</a>
+                </span>
+                <span class="comment-time">{{ c['created_at'] | timeago }}</span>
+                {% set cu = current_user() %}
+                {% if cu and cu['id'] == c['user_id'] %}
+                  <span class="comment-delete">
+                    <form action="{{ url_for('delete_comment', comment_id=c['id']) }}" method="post"
+                          onsubmit="return confirm('Удалить комментарий?')">
+                      <button type="submit" class="btn btn-danger btn-sm">✕</button>
+                    </form>
+                  </span>
+                {% endif %}
+              </div>
+              <p class="comment-text">{{ c['text'] }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding:1.5rem; text-align:center; color:var(--text-dim); font-size:.88rem;">
+          Комментариев пока нет. Будьте первым!
+        </div>
+        {% endif %}
+
+        <!-- Comment form (logged-in users only) -->
+        {% set cu = current_user() %}
+        {% if cu %}
+          <form class="comment-form"
+                action="{{ url_for('add_comment', image_id=image['id']) }}" method="post">
+            <textarea name="text" placeholder="Напишите комментарий…"
+                      required maxlength="1000"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">Отправить</button>
+          </form>
+        {% else %}
+          <div class="comment-login-prompt">
+            <a href="{{ url_for('login') }}">Войдите</a>, чтобы оставить комментарий
+          </div>
+        {% endif %}
+
+      </div><!-- /comments-card -->
+    </div><!-- /detail-sidebar -->
+  </div><!-- /detail-layout -->
+</div>
+{% endblock %}

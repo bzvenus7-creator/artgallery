@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="error-page">
+    <div class="error-code">{{ code }}</div>
+    <p class="error-msg">{{ message }}</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">← На главную</a>
+  </div>
+</div>
+{% endblock %}

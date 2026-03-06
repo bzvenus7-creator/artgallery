@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Profile header -->
+  <div class="profile-header">
+    <div class="profile-avatar">{{ user['username'][0] }}</div>
+    <div class="profile-info">
+      <h2>{{ user['username'] }}</h2>
+      <p>Участник с {{ user['created_at'][:10] }}</p>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-item">
+        <span class="stat-num">{{ images|length }}</span>
+        <span class="stat-label">Работ</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">{{ total_likes }}</span>
+        <span class="stat-label">Лайков</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section header -->
+  <div class="section-header">
+    <h2>Мои работы</h2>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary btn-sm">+ Загрузить</a>
+  </div>
+
+  {% if images %}
+  <div class="gallery-grid">
+    {% for img in images %}
+    <article class="image-card">
+      <a href="{{ url_for('image_detail', image_id=img['id']) }}" class="card-thumb">
+        <img src="{{ url_for('static', filename='uploads/' + img['filename']) }}"
+             alt="{{ img['title'] }}" loading="lazy">
+        <div class="card-overlay"><span>Открыть</span></div>
+      </a>
+      <div class="card-body">
+        <a class="card-title" href="{{ url_for('image_detail', image_id=img['id']) }}">
+          {{ img['title'] }}
+        </a>
+        <div class="card-meta">
+          <span>{{ img['uploaded_at'][:10] }}</span>
+          <div class="card-stats">
+            <span>♥ {{ img['like_count'] }}</span>
+            <span>💬 {{ img['comment_count'] }}</span>
+          </div>
+        </div>
+      </div>
+      <!-- Delete button visible only in own profile -->
+      <div class="profile-card-actions">
+        <form action="{{ url_for('delete_image', image_id=img['id']) }}" method="post"
+              onsubmit="return confirm('Удалить «{{ img['title'] }}»? Это необратимо.')">
+          <button type="submit" class="btn btn-danger btn-sm">🗑 Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">🎨</span>
+    <h3>Вы ещё не загружали работы</h3>
+    <p>Поделитесь своим творчеством с сообществом!</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Загрузить первую работу</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div class="profile-header" style="background: linear-gradient(135deg, #1a0a0a, #1c1c1c);">
+    <div class="profile-avatar" style="color:#e74c3c; border-color:#8a2020;">👑</div>
+    <div class="profile-info">
+      <h2 style="color:#e74c3c;">Админ-панель</h2>
+      <p>Полный контроль над контентом галереи</p>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-item">
+        <span class="stat-num" style="color:#e74c3c;">{{ images|length }}</span>
+        <span class="stat-label">Всего работ</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" style="color:#e74c3c;">{{ users_count }}</span>
+        <span class="stat-label">Пользователей</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <h2>Все изображения</h2>
+    <span class="count-badge" style="border-color:#8a2020; color:#e74c3c;">{{ images|length }}</span>
+  </div>
+
+  {% if images %}
+  <div class="gallery-grid">
+    {% for img in images %}
+    <article class="image-card" style="border-color:#2a1a1a;">
+      <a href="{{ url_for('image_detail', image_id=img['id']) }}" class="card-thumb">
+        <img src="{{ url_for('static', filename='uploads/' + img['filename']) }}"
+             alt="{{ img['title'] }}" loading="lazy">
+        <div class="card-overlay"><span>Открыть</span></div>
+      </a>
+      <div class="card-body">
+        <a class="card-title" href="{{ url_for('image_detail', image_id=img['id']) }}">
+          {{ img['title'] }}
+        </a>
+        <div class="card-meta">
+          <span class="card-author">
+            by <a href="{{ url_for('public_profile', username=img['username']) }}">{{ img['username'] }}</a>
+          </span>
+          <div class="card-stats">
+            <span>♥ {{ img['like_count'] }}</span>
+            <span>💬 {{ img['comment_count'] }}</span>
+          </div>
+        </div>
+        <div style="font-size:.75rem; color:var(--text-dim); margin-top:.25rem;">
+          {{ img['uploaded_at'][:16].replace('T', ' ') }}
+        </div>
+      </div>
+      <div class="profile-card-actions">
+        <form action="{{ url_for('delete_image', image_id=img['id']) }}" method="post"
+              onsubmit="return confirm('Удалить «{{ img['title'] }}» от {{ img['username'] }}?')">
+          <button type="submit" class="btn btn-danger btn-sm">🗑 Удалить</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">🖼️</span>
+    <h3>Изображений нет</h3>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

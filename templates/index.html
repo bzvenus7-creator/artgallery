@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ ("Поиск: " + search) if search else "Галерея" }} — ArtGallery{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  {% if not search %}
+  <!-- HERO — only shown on the home page -->
+  <section class="hero">
+    <p class="hero-eyebrow">✦ Добро пожаловать</p>
+    <h1>Галерея <em>творчества</em></h1>
+    <p>Исследуйте удивительные работы нашего сообщества или поделитесь своим собственным искусством.</p>
+    <div class="hero-actions">
+      {% set cu = current_user() %}
+      {% if cu %}
+        <a href="{{ url_for('upload') }}" class="btn btn-primary">🖼 Загрузить работу</a>
+        <a href="{{ url_for('profile') }}" class="btn btn-ghost">Мой профиль</a>
+      {% else %}
+        <a href="{{ url_for('register') }}" class="btn btn-primary">Начать бесплатно</a>
+        <a href="{{ url_for('login') }}" class="btn btn-ghost">Уже есть аккаунт</a>
+      {% endif %}
+    </div>
+  </section>
+  {% else %}
+  <!-- SEARCH HEADER -->
+  <div style="padding: 2rem 0 1rem;">
+    <a href="{{ url_for('index') }}" class="back-link">← Назад к галерее</a>
+    <h2 style="font-size:1.5rem; font-family:var(--font-display);">
+      Результаты для «{{ search }}»
+    </h2>
+  </div>
+  {% endif %}
+
+  <!-- GALLERY HEADER -->
+  <div class="section-header">
+    <h2>{% if search %}Найдено{% else %}Все работы{% endif %}</h2>
+    <span class="count-badge">{{ images|length }} изображений</span>
+  </div>
+
+  {% if images %}
+  <div class="gallery-grid">
+    {% for img in images %}
+    <article class="image-card">
+      <a href="{{ url_for('image_detail', image_id=img['id']) }}" class="card-thumb">
+        <img src="{{ url_for('static', filename='uploads/' + img['filename']) }}"
+             alt="{{ img['title'] }}" loading="lazy">
+        <div class="card-overlay"><span>Открыть</span></div>
+      </a>
+      <div class="card-body">
+        <a class="card-title" href="{{ url_for('image_detail', image_id=img['id']) }}">
+          {{ img['title'] }}
+        </a>
+        {% if img['description'] %}
+          <p class="card-desc">{{ img['description'] }}</p>
+        {% endif %}
+        <div class="card-meta">
+          <span class="card-author">
+            by <a href="{{ url_for('public_profile', username=img['username']) }}">{{ img['username'] }}</a>
+          </span>
+          <div class="card-stats">
+            <span>♥ {{ img['like_count'] }}</span>
+            <span>💬 {{ img['comment_count'] }}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">🖼️</span>
+    <h3>{% if search %}Ничего не найдено{% else %}Галерея пуста{% endif %}</h3>
+    <p>
+      {% if search %}
+        Попробуйте изменить поисковый запрос.
+      {% else %}
+        Будьте первым, кто загрузит работу!
+      {% endif %}
+    </p>
+    {% if not search %}
+      <a href="{{ url_for('upload') }}" class="btn btn-primary">Загрузить изображение</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

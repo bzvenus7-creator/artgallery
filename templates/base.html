@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ArtGallery{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══════════════════════════════════════════════════ -->
+<nav class="navbar">
+  <a class="navbar-brand" href="{{ url_for('index') }}">Art<span>Gallery</span></a>
+
+  <form class="navbar-search" action="{{ url_for('index') }}" method="get">
+    <span class="search-icon">🔍</span>
+    <input type="text" name="q" placeholder="Поиск изображений…"
+           value="{{ request.args.get('q', '') }}">
+  </form>
+
+  <div class="navbar-links">
+    {% set cu = current_user() %}
+    {% if cu %}
+      <a href="{{ url_for('upload') }}" class="btn btn-primary btn-sm">+ Загрузить</a>
+      {% if is_admin() %}
+      <a href="{{ url_for('admin_panel') }}" class="btn btn-sm" style="background:#8a2020;color:#fff;">👑 Админ</a>
+      {% endif %}
+      <a href="{{ url_for('profile') }}" class="username-badge">{{ cu['username'] }}</a>
+      <a href="{{ url_for('logout') }}">Выйти</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Войти</a>
+      <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Регистрация</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- ═══ FLASH MESSAGES ═══════════════════════════════════════════ -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container" id="flashContainer">
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">
+          <span>{{ message }}</span>
+          <button class="flash-close" onclick="this.parentElement.remove()" title="Закрыть">✕</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ═══ MAIN CONTENT ════════════════════════════════════════════ -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ═══ FOOTER ══════════════════════════════════════════════════ -->
+<footer>
+  <p>© 2026 <span>ArtGallery</span> — делитесь творчеством с нами</p>
+</footer>
+
+<script>
+  /* Auto-dismiss flash messages after 5 s */
+  (function () {
+    const fc = document.getElementById('flashContainer');
+    if (!fc) return;
+    setTimeout(() => {
+      fc.style.transition = 'opacity .4s';
+      fc.style.opacity = '0';
+      setTimeout(() => fc.remove(), 400);
+    }, 5000);
+  })();
+
+  /* Drag-and-drop / click file upload */
+  (function () {
+    const zone  = document.getElementById('dropZone');
+    const input = document.getElementById('fileInput');
+    const label = document.getElementById('fileName');
+    if (!zone || !input) return;
+
+    zone.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', () => {
+      if (input.files[0] && label)
+        label.textContent = '✓ ' + input.files[0].name;
+    });
+
+    ['dragover', 'dragenter'].forEach(ev =>
+      zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag-over'); })
+    );
+    ['dragleave', 'drop'].forEach(ev =>
+      zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag-over'); })
+    );
+    zone.addEventListener('drop', e => {
+      const f = e.dataTransfer.files[0];
+      if (!f) return;
+      input.files = e.dataTransfer.files;
+      if (label) label.textContent = '✓ ' + f.name;
+    });
+  })();
+</script>
+
+</body>
+</html>
