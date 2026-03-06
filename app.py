@@ -23,7 +23,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'artgallery-change-this-in-production!')
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
-DDATABASE      = os.environ.get('DATABASE',      os.path.join(BASE_DIR, 'gallery.db'))
+DATABASE      = os.environ.get('DATABASE',      os.path.join(BASE_DIR, 'gallery.db'))
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'static', 'uploads'))
 ALLOWED_EXT   = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_MB        = 16
@@ -32,14 +32,12 @@ app.config['UPLOAD_FOLDER']      = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_MB * 1024 * 1024
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
 
 # ─── Admin ───────────────────────────────────────────────────────────────────
 ADMIN_USERNAME = '1237123713sdajddaa223'
 ADMIN_PASSWORD = 'admin123'
 
 # ─── Auto-init DB ─────────────────────────────────────────────────────────────
-# Таблицы создаются при первом запуске автоматически — init_db.py не нужен.
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -80,7 +78,6 @@ def _init_db():
     con.commit()
     con.close()
 
-# Run once at import time — safe because of IF NOT EXISTS
 _init_db()
 
 def _ensure_admin():
@@ -89,8 +86,6 @@ def _ensure_admin():
     con.row_factory = sqlite3.Row
     existing = con.execute('SELECT id FROM users WHERE username=?', (ADMIN_USERNAME,)).fetchone()
     if not existing:
-        from werkzeug.security import generate_password_hash
-        from datetime import datetime
         con.execute(
             'INSERT INTO users (username, password_hash, created_at) VALUES (?,?,?)',
             (ADMIN_USERNAME, generate_password_hash(ADMIN_PASSWORD), datetime.utcnow().isoformat())
@@ -103,13 +98,11 @@ _ensure_admin()
 # ─── Database helpers ─────────────────────────────────────────────────────────
 
 def get_db():
-    """Return the per-request SQLite connection, creating it if needed."""
     if 'db' not in g:
         g.db = sqlite3.connect(DATABASE)
         g.db.row_factory = sqlite3.Row
         g.db.execute('PRAGMA foreign_keys=ON')
     return g.db
-
 
 @app.teardown_appcontext
 def close_db(exc=None):
@@ -117,16 +110,12 @@ def close_db(exc=None):
     if db:
         db.close()
 
-
 def q(sql, args=(), one=False):
-    """Execute a SELECT and return one row or all rows."""
     cur = get_db().execute(sql, args)
     rv  = cur.fetchall()
     return (rv[0] if rv else None) if one else rv
 
-
 def m(sql, args=()):
-    """Execute an INSERT/UPDATE/DELETE, commit, and return lastrowid."""
     db  = get_db()
     cur = db.execute(sql, args)
     db.commit()
@@ -143,19 +132,14 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-
 def current_user():
-    """Return the logged-in user row, or None. Available in all templates."""
     if 'user_id' in session:
         return q('SELECT * FROM users WHERE id=?', (session['user_id'],), one=True)
     return None
 
-
 def is_admin():
-    """Return True if the currently logged-in user is the admin."""
     return session.get('username') == ADMIN_USERNAME
 
-# Make helpers callable from every Jinja template
 app.jinja_env.globals['current_user'] = current_user
 app.jinja_env.globals['is_admin']     = is_admin
 
@@ -163,7 +147,6 @@ app.jinja_env.globals['is_admin']     = is_admin
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXT
-
 
 def unique_filename(original):
     ext = original.rsplit('.', 1)[1].lower() if '.' in original else 'jpg'
@@ -214,7 +197,6 @@ def register():
             return redirect(url_for('index'))
     return render_template('register.html')
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -229,7 +211,6 @@ def login():
             flash(f'С возвращением, {username}!', 'success')
             return redirect(url_for('index'))
     return render_template('login.html')
-
 
 @app.route('/logout')
 def logout():
@@ -262,7 +243,6 @@ def index():
         )
     return render_template('index.html', images=rows, search=search)
 
-
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
@@ -270,7 +250,6 @@ def upload():
         title       = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
         file        = request.files.get('image')
-
         if not title:
             flash('Название обязательно.', 'error')
         elif not file or file.filename == '':
@@ -288,7 +267,6 @@ def upload():
             return redirect(url_for('index'))
     return render_template('upload.html')
 
-
 @app.route('/image/<int:image_id>')
 def image_detail(image_id):
     img = q(
@@ -300,7 +278,6 @@ def image_detail(image_id):
     if not img:
         flash('Изображение не найдено.', 'error')
         return redirect(url_for('index'))
-
     comments = q(
         '''SELECT c.*, u.username FROM comments c
            JOIN users u ON c.user_id=u.id
@@ -315,7 +292,6 @@ def image_detail(image_id):
         ) is not None
     return render_template('image_detail.html', image=img, comments=comments, user_liked=user_liked)
 
-
 @app.route('/image/<int:image_id>/delete', methods=['POST'])
 @login_required
 def delete_image(image_id):
@@ -323,7 +299,6 @@ def delete_image(image_id):
     if not img:
         flash('Изображение не найдено.', 'error')
         return redirect(url_for('index'))
-    # Allow owner OR admin to delete
     if img['user_id'] != session['user_id'] and not is_admin():
         flash('Нет доступа.', 'error')
         return redirect(url_for('image_detail', image_id=image_id))
@@ -332,11 +307,9 @@ def delete_image(image_id):
         os.remove(fpath)
     m('DELETE FROM images WHERE id=?', (image_id,))
     flash('Изображение удалено.', 'success')
-    # Admin goes back to gallery; owner goes to their profile
     if is_admin() and img['user_id'] != session['user_id']:
         return redirect(url_for('index'))
     return redirect(url_for('profile'))
-
 
 @app.route('/image/<int:image_id>/like', methods=['POST'])
 @login_required
@@ -346,7 +319,6 @@ def toggle_like(image_id):
     else:
         m('INSERT INTO likes (image_id, user_id) VALUES (?,?)', (image_id, session['user_id']))
     return redirect(url_for('image_detail', image_id=image_id))
-
 
 @app.route('/image/<int:image_id>/comment', methods=['POST'])
 @login_required
@@ -362,7 +334,6 @@ def add_comment(image_id):
             (image_id, session['user_id'], text, datetime.utcnow().isoformat())
         )
     return redirect(url_for('image_detail', image_id=image_id))
-
 
 @app.route('/comment/<int:comment_id>/delete', methods=['POST'])
 @login_required
@@ -396,7 +367,6 @@ def profile():
     total_likes = sum(img['like_count'] for img in images)
     return render_template('profile.html', user=user, images=images, total_likes=total_likes)
 
-
 @app.route('/profile/<username>')
 def public_profile(username):
     user = q('SELECT * FROM users WHERE username=?', (username,), one=True)
@@ -412,7 +382,6 @@ def public_profile(username):
     )
     total_likes = sum(img['like_count'] for img in images)
     return render_template('public_profile.html', profile_user=user, images=images, total_likes=total_likes)
-
 
 # ─── Routes: Admin ────────────────────────────────────────────────────────────
 
