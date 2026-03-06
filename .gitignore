@@ -1,0 +1,8 @@
+gallery.db
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+static/uploads/*
+!static/uploads/.gitkeep
