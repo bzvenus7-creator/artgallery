@@ -19,11 +19,10 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS images (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     title       TEXT    NOT NULL,
     description TEXT    DEFAULT '',
-    mimetype    TEXT    NOT NULL DEFAULT 'image/jpeg',
-    data        BLOB    NOT NULL,
+    filename    TEXT    NOT NULL,
     uploaded_at TEXT    NOT NULL
 );
 
@@ -53,7 +52,7 @@ def init():
     con.executescript(SCHEMA)
     con.commit()
     con.close()
-    print(f"✅ База данных создана: {DB}")
+    print(f"✅  База данных создана: {DB}")
 
 
 if __name__ == '__main__':
