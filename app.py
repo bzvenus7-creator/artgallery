@@ -23,8 +23,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'artgallery-change-this-in-production!')
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
-DATABASE      = os.path.join(BASE_DIR, 'gallery.db')
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+DDATABASE      = os.environ.get('DATABASE',      os.path.join(BASE_DIR, 'gallery.db'))
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'static', 'uploads'))
 ALLOWED_EXT   = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_MB        = 16
 
@@ -32,6 +32,7 @@ app.config['UPLOAD_FOLDER']      = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_MB * 1024 * 1024
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
 
 # ─── Admin ───────────────────────────────────────────────────────────────────
 ADMIN_USERNAME = '1237123713sdajddaa223'
